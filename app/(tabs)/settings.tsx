@@ -6,13 +6,14 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTimeFormat } from '@/services/features/hours_types';
 
 export default function SettingsScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [use24HourFormat, setUse24HourFormat] = useState(false);
   const [autoLocation, setAutoLocation] = useState(false);
   const colorScheme = useColorScheme();
   const themeColors = Colors[colorScheme ?? 'light'];
+  const { use24HourFormat, toggleTimeFormat } = useTimeFormat();
 
   return (
     <ThemedView style={styles.container}>
@@ -33,7 +34,7 @@ export default function SettingsScreen() {
           title="استخدام نظام 24 ساعة" 
           icon="access-time"
           value={use24HourFormat}
-          onValueChange={setUse24HourFormat}
+          onValueChange={toggleTimeFormat}
           themeColors={themeColors}
         />
         

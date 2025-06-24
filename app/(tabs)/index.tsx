@@ -6,56 +6,12 @@ import { ActivityIndicator, Image, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { cityMapping, egyptianGovernorates, getHeaderGradient, prayerArabicNames, prayerIcons } from '@/constants/prayerData';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTimeFormat } from '@/services/features/hours_types';
 import { getPrayerTimes } from '@/services/prayerTimesService';
-
-// Define interface for prayer times data
-interface PrayerTimesData {
-  fajr: string;
-  sunrise: string;
-  dhuhr: string;
-  asr: string;
-  maghrib: string;
-  isha: string;
-}
-
-// Egyptian governorates list in Arabic
-const egyptianGovernorates = [
-  'القاهرة', 'الإسكندرية', 'الجيزة', 'شبرا الخيمة', 'بورسعيد', 'السويس',
-  'الأقصر', 'أسوان', 'أسيوط', 'المحلة الكبرى', 'طنطا', 'المنصورة',
-  'الفيوم', 'الزقازيق', 'الإسماعيلية', 'بني سويف', 'سوهاج'
-];
-
-// City mapping for API
-const cityMapping: Record<string, string> = {
-  'القاهرة': 'Cairo',
-  'الإسكندرية': 'Alexandria',
-  'الجيزة': 'Giza',
-  'شبرا الخيمة': 'Shubra El-Kheima',
-  'بورسعيد': 'Port Said',
-  'السويس': 'Suez',
-  'الأقصر': 'Luxor',
-  'أسوان': 'Aswan',
-  'أسيوط': 'Asyut',
-  'المحلة الكبرى': 'Al Mahalla Al Kubra',
-  'طنطا': 'Tanta',
-  'المنصورة': 'Mansoura',
-  'الفيوم': 'Faiyum',
-  'الزقازيق': 'Zagazig',
-  'الإسماعيلية': 'Ismailia',
-  'بني سويف': 'Beni Suef',
-  'سوهاج': 'Sohag'
-};
-
-// Prayer icons mapping with proper types
-const prayerIcons: Record<string, React.ComponentProps<typeof MaterialCommunityIcons>['name']> = {
-  fajr: "weather-sunset-up",  // Changed from "sunrise" to a valid icon name
-  sunrise: "white-balance-sunny",
-  dhuhr: "weather-sunny",
-  asr: "weather-partly-cloudy",
-  maghrib: "weather-sunset-down",
-  isha: "weather-night"
-};
+import { PrayerTimesData } from '@/types/prayerTimes';
+import { determineNextPrayer, formatArabicDate } from '@/utils/prayerHelpers';
 
 export default function PrayerTimesScreen() {
   const [selectedCity, setSelectedCity] = useState<keyof typeof cityMapping>('القاهرة');
@@ -66,9 +22,7 @@ export default function PrayerTimesScreen() {
   const colorScheme = useColorScheme();
   
   useEffect(() => {
-    const date = new Date();
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' } as const;
-    setCurrentDate(date.toLocaleDateString('ar-EG', options));
+    setCurrentDate(formatArabicDate());
     
     const fetchPrayerTimes = async () => {
       setLoading(true);
@@ -76,7 +30,7 @@ export default function PrayerTimesScreen() {
         // Use the English city name for API with proper TypeScript handling
         const times = await getPrayerTimes(cityMapping[selectedCity]);
         setPrayerTimes(times as PrayerTimesData);
-        determineNextPrayer(times as PrayerTimesData);
+        setNextPrayer(determineNextPrayer(times as PrayerTimesData));
       } catch (error) {
         console.error('Failed to fetch prayer times:', error);
       } finally {
@@ -87,55 +41,12 @@ export default function PrayerTimesScreen() {
     fetchPrayerTimes();
   }, [selectedCity]);
 
-  const determineNextPrayer = (times: PrayerTimesData) => {
-    if (!times) return;
-    
-    const now = new Date();
-    const currentHour = now.getHours();
-    const currentMinutes = now.getMinutes();
-    const currentTime = currentHour * 60 + currentMinutes;
-    
-    const prayers = [
-      { name: 'fajr', time: times.fajr },
-      { name: 'sunrise', time: times.sunrise },
-      { name: 'dhuhr', time: times.dhuhr },
-      { name: 'asr', time: times.asr },
-      { name: 'maghrib', time: times.maghrib },
-      { name: 'isha', time: times.isha }
-    ];
-    
-    for (const prayer of prayers) {
-      const [prayerHour, prayerMinute] = prayer.time.split(':').map(Number);
-      const prayerTime = prayerHour * 60 + prayerMinute;
-      
-      if (prayerTime > currentTime) {
-        setNextPrayer(prayer.name);
-        return;
-      }
-    }
-    
-    // If all prayers have passed, next prayer is Fajr tomorrow
-    setNextPrayer('fajr');
-  };
-
-  const getCardGradient = () => {
-    return colorScheme === 'dark' 
-      ? ['#1E3A5F', '#16213E']
-      : ['#E1F5FE', '#B3E5FC'];
-  };
-  
-  const getHeaderGradient = () => {
-    return colorScheme === 'dark'
-      ? ['#0D1B2A', '#1B263B'] 
-      : ['#2196F3', '#64B5F6'];
-  };
-
   return (
     <ThemedView style={[styles.container, 
       { backgroundColor: colorScheme === 'dark' ? '#121212' : '#FFFFFF' }]}>
       
       <LinearGradient
-        colors={getHeaderGradient()}
+        colors={getHeaderGradient(colorScheme === 'dark')}
         style={styles.headerCard}>
         <ThemedText style={styles.dateText}>{currentDate}</ThemedText>
         <ThemedText style={styles.headerText}>مواقيت الصلاة</ThemedText>
@@ -144,15 +55,14 @@ export default function PrayerTimesScreen() {
           <MaterialCommunityIcons 
             name="map-marker" 
             size={24} 
-            color={colorScheme === 'dark' ? '#FFFFFF' : '#FFFFFF'} 
+            color="#FFFFFF"
             style={styles.pickerIcon} 
           />
           <Picker
             selectedValue={selectedCity}
-            onValueChange={(itemValue) => setSelectedCity(itemValue)}
-            style={[styles.picker, 
-              { color: colorScheme === 'dark' ? '#FFFFFF' : '#FFFFFF' }]}
-            dropdownIconColor={colorScheme === 'dark' ? '#FFFFFF' : '#FFFFFF'}>
+            onValueChange={(itemValue) => setSelectedCity(itemValue as keyof typeof cityMapping)}
+            style={[styles.picker, { color: '#FFFFFF' }]}
+            dropdownIconColor="#FFFFFF">
             {egyptianGovernorates.map((city) => (
               <Picker.Item key={city} label={city} value={city} />
             ))}
@@ -167,48 +77,7 @@ export default function PrayerTimesScreen() {
         </View>
       ) : prayerTimes ? (
         <View style={styles.timesContainer}>
-          <PrayerTimeRow 
-            name="الفجر" 
-            time={prayerTimes.fajr} 
-            icon={prayerIcons.fajr}
-            isNext={nextPrayer === 'fajr'}
-            colorScheme={colorScheme}
-          />
-          <PrayerTimeRow 
-            name="الشروق" 
-            time={prayerTimes.sunrise} 
-            icon={prayerIcons.sunrise}
-            isNext={nextPrayer === 'sunrise'}
-            colorScheme={colorScheme}
-          />
-          <PrayerTimeRow 
-            name="الظهر" 
-            time={prayerTimes.dhuhr} 
-            icon={prayerIcons.dhuhr}
-            isNext={nextPrayer === 'dhuhr'}
-            colorScheme={colorScheme}
-          />
-          <PrayerTimeRow 
-            name="العصر" 
-            time={prayerTimes.asr} 
-            icon={prayerIcons.asr}
-            isNext={nextPrayer === 'asr'}
-            colorScheme={colorScheme}
-          />
-          <PrayerTimeRow 
-            name="المغرب" 
-            time={prayerTimes.maghrib} 
-            icon={prayerIcons.maghrib}
-            isNext={nextPrayer === 'maghrib'}
-            colorScheme={colorScheme}
-          />
-          <PrayerTimeRow 
-            name="العشاء" 
-            time={prayerTimes.isha} 
-            icon={prayerIcons.isha}
-            isNext={nextPrayer === 'isha'}
-            colorScheme={colorScheme}
-          />
+          {renderPrayerTimes(prayerTimes, nextPrayer, colorScheme)}
         </View>
       ) : (
         <ThemedText style={styles.noDataText}>لا توجد بيانات متاحة</ThemedText>
@@ -224,8 +93,14 @@ export default function PrayerTimesScreen() {
   );
 }
 
+/**
+ * Component for displaying a prayer time row
+ */
 function PrayerTimeRow({ name, time, icon, isNext, colorScheme }: 
   { name: string, time: string, icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'], isNext: boolean, colorScheme: string | null | undefined }) {
+  
+  // Get formatTime function
+  const { formatTime } = useTimeFormat();
   
   // Ensure colorScheme is always a string
   const theme = colorScheme || 'light';
@@ -257,10 +132,10 @@ function PrayerTimeRow({ name, time, icon, isNext, colorScheme }:
         />
       </View>
       
-      {/* Prayer time (switched position as requested) */}
-      <ThemedText style={[styles.prayerTime, { color: textColor }]}>{time}</ThemedText>
+      {/* Prayer time - Now using the formatTime function */}
+      <ThemedText style={[styles.prayerTime, { color: textColor }]}>{formatTime(time)}</ThemedText>
       
-      {/* Prayer name (switched position as requested) */}
+      {/* Prayer name */}
       <ThemedText style={[styles.prayerName, { color: textColor }]}>{name}</ThemedText>
       
       {isNext && (
@@ -272,6 +147,31 @@ function PrayerTimeRow({ name, time, icon, isNext, colorScheme }:
       )}
     </View>
   );
+}
+
+/**
+ * Render prayer times rows
+ */
+function renderPrayerTimes(times: PrayerTimesData, nextPrayer: string | null, colorScheme: string | null | undefined) {
+  const prayers = [
+    { key: 'fajr', time: times.fajr },
+    { key: 'sunrise', time: times.sunrise },
+    { key: 'dhuhr', time: times.dhuhr },
+    { key: 'asr', time: times.asr },
+    { key: 'maghrib', time: times.maghrib },
+    { key: 'isha', time: times.isha }
+  ];
+  
+  return prayers.map(prayer => (
+    <PrayerTimeRow 
+      key={prayer.key}
+      name={prayerArabicNames[prayer.key]}
+      time={prayer.time} 
+      icon={prayerIcons[prayer.key]}
+      isNext={nextPrayer === prayer.key}
+      colorScheme={colorScheme}
+    />
+  ));
 }
 
 const styles = StyleSheet.create({
