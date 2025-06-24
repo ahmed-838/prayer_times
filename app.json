@@ -4,7 +4,7 @@
     "slug": "PrayerTimes",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/mosque_silhouette.png",
     "scheme": "prayertimes",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -13,10 +13,11 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/images/mosque_silhouette.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.ahmed_shams.PrayerTimes"
     },
     "web": {
       "bundler": "metro",
