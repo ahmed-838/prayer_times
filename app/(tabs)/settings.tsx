@@ -1,6 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { useState } from 'react';
-import { StyleSheet, Switch } from 'react-native';
+import { Link } from 'expo-router';
+import { StyleSheet, Switch, TouchableOpacity } from 'react-native';
 
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -9,8 +9,6 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { useTimeFormat } from '@/services/features/hours_types';
 
 export default function SettingsScreen() {
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [autoLocation, setAutoLocation] = useState(false);
   const colorScheme = useColorScheme();
   const themeColors = Colors[colorScheme ?? 'light'];
   const { use24HourFormat, toggleTimeFormat } = useTimeFormat();
@@ -22,11 +20,9 @@ export default function SettingsScreen() {
       </ThemedView>
 
       <ThemedView style={[styles.card, { backgroundColor: themeColors.cardBackground }]}>
-        <SettingRow 
+        <NotificationSettingRow 
           title="تفعيل الإشعارات" 
           icon="notifications"
-          value={notificationsEnabled}
-          onValueChange={setNotificationsEnabled}
           themeColors={themeColors}
         />
         
@@ -36,30 +32,30 @@ export default function SettingsScreen() {
           value={use24HourFormat}
           onValueChange={toggleTimeFormat}
           themeColors={themeColors}
-        />
-        
-        <SettingRow 
-          title="تحديد الموقع تلقائيًا" 
-          icon="location-on"
-          value={autoLocation}
-          onValueChange={setAutoLocation}
-          themeColors={themeColors}
           isLast={true}
         />
       </ThemedView>
       
       <ThemedView style={[styles.card, { backgroundColor: themeColors.cardBackground, marginTop: 20 }]}>
-        <ThemedView style={styles.aboutRow}>
-          <MaterialIcons name="info" size={24} color={themeColors.tint} style={styles.aboutIcon} />
-          <ThemedText style={styles.aboutText}>عن التطبيق</ThemedText>
-        </ThemedView>
+        <Link href="/about" asChild>
+          <TouchableOpacity>
+            <ThemedView style={styles.aboutRow}>
+              <MaterialIcons name="info" size={24} color={themeColors.tint} style={styles.aboutIcon} />
+              <ThemedText style={styles.aboutText}>عن التطبيق</ThemedText>
+            </ThemedView>
+          </TouchableOpacity>
+        </Link>
         
         <ThemedView style={[styles.divider, { borderBottomColor: themeColors.border }]} />
         
-        <ThemedView style={styles.aboutRow}>
-          <MaterialIcons name="help" size={24} color={themeColors.tint} style={styles.aboutIcon} />
-          <ThemedText style={styles.aboutText}>المساعدة والدعم</ThemedText>
-        </ThemedView>
+        <Link href="/help-support" asChild>
+          <TouchableOpacity>
+            <ThemedView style={styles.aboutRow}>
+              <MaterialIcons name="help" size={24} color={themeColors.tint} style={styles.aboutIcon} />
+              <ThemedText style={styles.aboutText}>المساعدة والدعم</ThemedText>
+            </ThemedView>
+          </TouchableOpacity>
+        </Link>
       </ThemedView>
       
       <ThemedView style={styles.infoSection}>
@@ -115,6 +111,28 @@ function SettingRow({ title, icon, value, onValueChange, themeColors, isLast = f
         />
       </ThemedView>
       {!isLast && <ThemedView style={[styles.divider, { borderBottomColor: themeColors.border }]} />}
+    </>
+  );
+}
+
+// Adding a new component for the notification row with "coming soon" text
+interface NotificationSettingRowProps {
+  title: string;
+  icon: React.ComponentProps<typeof MaterialIcons>['name'];
+  themeColors: ThemeColors;
+}
+
+function NotificationSettingRow({ title, icon, themeColors }: NotificationSettingRowProps) {
+  return (
+    <>
+      <ThemedView style={styles.settingRow}>
+        <ThemedView style={styles.settingTitleContainer}>
+          <MaterialIcons name={icon} size={24} color={themeColors.tint} style={styles.settingIcon} />
+          <ThemedText style={styles.settingTitle}>{title}</ThemedText>
+        </ThemedView>
+        <ThemedText style={styles.comingSoonText}>قريبا</ThemedText>
+      </ThemedView>
+      <ThemedView style={[styles.divider, { borderBottomColor: themeColors.border }]} />
     </>
   );
 }
@@ -184,5 +202,11 @@ const styles = StyleSheet.create({
   versionText: {
     fontSize: 14,
     opacity: 0.6,
+  },
+  comingSoonText: {
+    fontSize: 14,
+    fontStyle: 'italic',
+    color: '#888',
+    paddingHorizontal: 10,
   },
 });
