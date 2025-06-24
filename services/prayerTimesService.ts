@@ -1,4 +1,24 @@
-import { PrayerTimesData } from '@/types/prayerTimes';
+import { DateInfo, PrayerTimesData } from '@/types/prayerTimes';
+
+interface ApiResponse {
+  code: number;
+  status: string;
+  data: {
+    timings: ApiTimings;
+    date: DateInfo;
+  };
+}
+
+// Interface that matches the actual API response structure with capitalized properties
+interface ApiTimings {
+  Fajr: string;
+  Sunrise: string;
+  Dhuhr: string;
+  Asr: string;
+  Maghrib: string;
+  Isha: string;
+  [key: string]: string; // To accommodate any additional timing values
+}
 
 // API base URL
 const API_BASE_URL = 'http://api.aladhan.com/v1/timingsByCity';
@@ -7,40 +27,34 @@ const API_BASE_URL = 'http://api.aladhan.com/v1/timingsByCity';
  * Get prayer times for a specific city
  * 
  * @param {string} city - The name of the city
- * @returns {Promise<PrayerTimesData>} - Prayer times
+ * @returns {Promise<{timings: PrayerTimesData, date: DateInfo}>} - Prayer times and date info
  */
-export async function getPrayerTimes(city: string): Promise<PrayerTimesData> {
+export async function getPrayerTimes(city: string): Promise<{timings: PrayerTimesData, date: DateInfo}> {
   try {
-    // Set country to Egypt since we're focusing on Egyptian governorates
-    const country = 'Egypt';
-    const method = 5; // Egyptian General Authority of Survey
-
-    // Get today's date
-    const date = new Date();
-    const month = date.getMonth() + 1;
-    const year = date.getFullYear();
-    
-    const url = `${API_BASE_URL}?city=${encodeURIComponent(city)}&country=${encodeURIComponent(country)}&method=${method}&month=${month}&year=${year}`;
-    
-    const response = await fetch(url);
+    const response = await fetch(
+      `${API_BASE_URL}?city=${encodeURIComponent(city)}&country=Egypt`
+    );
     
     if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
+      throw new Error(`API responded with status: ${response.status}`);
     }
     
-    const data = await response.json();
+    const data: ApiResponse = await response.json();
+    const apiTimings = data.data.timings;
     
-    // Get the timings from response
-    const timings = data.data.timings;
+    // Converting from API response format to our internal format
+    const formattedTimings: PrayerTimesData = {
+      fajr: formatTime(apiTimings.Fajr),
+      sunrise: formatTime(apiTimings.Sunrise),
+      dhuhr: formatTime(apiTimings.Dhuhr),
+      asr: formatTime(apiTimings.Asr),
+      maghrib: formatTime(apiTimings.Maghrib),
+      isha: formatTime(apiTimings.Isha),
+    };
     
-    // Return formatted prayer times
     return {
-      fajr: formatTime(timings.Fajr),
-      sunrise: formatTime(timings.Sunrise),
-      dhuhr: formatTime(timings.Dhuhr),
-      asr: formatTime(timings.Asr),
-      maghrib: formatTime(timings.Maghrib),
-      isha: formatTime(timings.Isha),
+      timings: formattedTimings,
+      date: data.data.date
     };
   } catch (error) {
     console.error('Error fetching prayer times:', error);

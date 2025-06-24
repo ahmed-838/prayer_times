@@ -9,6 +9,44 @@ export interface PrayerTimesData {
   isha: string;
 }
 
+export interface DateInfo {
+  readable: string;
+  timestamp: string;
+  gregorian: {
+    date: string;
+    format: string;
+    day: string;
+    weekday: {
+      en: string;
+    };
+    month: {
+      number: number;
+      en: string;
+    };
+    year: string;
+  };
+  hijri: {
+    date: string;
+    format: string;
+    day: string;
+    weekday: {
+      en: string;
+      ar: string;
+    };
+    month: {
+      number: number;
+      en: string;
+      ar: string;
+    };
+    year: string;
+  };
+}
+
+export interface PrayerTimesResponse {
+  timings: PrayerTimesData;
+  date: DateInfo;
+}
+
 export interface Prayer {
   name: string;
   time: string;

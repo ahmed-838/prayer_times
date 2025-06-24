@@ -8,15 +8,16 @@ import { cityMapping, egyptianGovernorates, getHeaderGradient, prayerArabicNames
 import { useTheme } from '@/context/ThemeContext';
 import { useTimeFormat } from '@/services/features/hours_types';
 import { getPrayerTimes } from '@/services/prayerTimesService';
-import { PrayerTimesData } from '@/types/prayerTimes';
-import { determineNextPrayer, formatArabicDate } from '@/utils/prayerHelpers';
+import { DateInfo, PrayerTimesData } from '@/types/prayerTimes';
+import { determineNextPrayer } from '@/utils/prayerHelpers';
 import NextPrayerTime from '../../services/features/nextPrayerTime';
 
 export default function PrayerTimesScreen() {
   const [selectedCity, setSelectedCity] = useState<keyof typeof cityMapping>('القاهرة');
   const [prayerTimes, setPrayerTimes] = useState<PrayerTimesData | null>(null);
+  const [dateInfo, setDateInfo] = useState<DateInfo | null>(null);
   const [loading, setLoading] = useState(false);
-  const [currentDate, setCurrentDate] = useState('');
+  const [currentDate] = useState('');
   const [nextPrayer, setNextPrayer] = useState<string | null>(null);
   const { isDarkMode, toggleTheme } = useTheme();
   
@@ -30,14 +31,15 @@ export default function PrayerTimesScreen() {
   );
   
   useEffect(() => {
-    setCurrentDate(formatArabicDate());
-    
     const fetchPrayerTimes = async () => {
       setLoading(true);
       try {
-        const times = await getPrayerTimes(cityMapping[selectedCity]);
-        setPrayerTimes(times as PrayerTimesData);
-        setNextPrayer(determineNextPrayer(times as PrayerTimesData));
+        const result = await getPrayerTimes(cityMapping[selectedCity]) as { timings: PrayerTimesData; date: DateInfo };
+        setPrayerTimes(result.timings);
+        setDateInfo(result.date);
+        setNextPrayer(determineNextPrayer(result.timings));
+        
+        // لم نعد بحاجة للتاريخ المنسق محليًا، سنستخدم التاريخ من API
       } catch (error) {
         console.error('Failed to fetch prayer times:', error);
       } finally {
@@ -47,6 +49,29 @@ export default function PrayerTimesScreen() {
     
     fetchPrayerTimes();
   }, [selectedCity]);
+
+  // تنسيق عرض التاريخ الهجري بالعربي
+  const formatHijriDate = (date: DateInfo | null) => {
+    if (!date) return '';
+    const { day, month, year } = date.hijri;
+    return `${day} ${month.ar} ${year}هـ`;
+  };
+
+  // تنسيق عرض التاريخ الميلادي بالعربي
+  const formatGregorianDate = (date: DateInfo | null) => {
+    if (!date) return '';
+    const { day, month, year } = date.gregorian;
+    
+    // ترجمة أسماء الشهور للعربية
+    const arabicMonths: Record<string, string> = {
+      'January': 'يناير', 'February': 'فبراير', 'March': 'مارس',
+      'April': 'أبريل', 'May': 'مايو', 'June': 'يونيو',
+      'July': 'يوليو', 'August': 'أغسطس', 'September': 'سبتمبر',
+      'October': 'أكتوبر', 'November': 'نوفمبر', 'December': 'ديسمبر'
+    };
+    
+    return `${day} ${arabicMonths[month.en]} ${year}م`;
+  };
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: isDarkMode ? '#121212' : '#FFFFFF' }]}>
@@ -62,7 +87,18 @@ export default function PrayerTimesScreen() {
             style={styles.headerGradient}
           >
             <View style={styles.headerTopRow}>
-              <ThemedText style={styles.dateText}>{currentDate}</ThemedText>
+              {dateInfo ? (
+                <View style={styles.datesContainer}>
+                  <ThemedText style={styles.hijriDate}>
+                    {formatHijriDate(dateInfo)}
+                  </ThemedText>
+                  <ThemedText style={styles.gregorianDate}>
+                    {formatGregorianDate(dateInfo)}
+                  </ThemedText>
+                </View>
+              ) : (
+                <ThemedText style={styles.dateText}>{currentDate}</ThemedText>
+              )}
               
               {/* زر تبديل الوضع */}
               <TouchableOpacity 
@@ -582,5 +618,21 @@ const styles = StyleSheet.create({
     marginTop: 10,
     textAlign: 'center',
     opacity: 0.7,
+  },
+  hijriDate: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  gregorianDate: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    opacity: 0.8,
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  datesContainer: {
+    alignItems: 'center',
   },
 });
