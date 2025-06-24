@@ -1,17 +1,16 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Picker } from '@react-native-picker/picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, Modal, Platform, SafeAreaView, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
 import { cityMapping, egyptianGovernorates, getHeaderGradient, prayerArabicNames, prayerIcons } from '@/constants/prayerData';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTheme } from '@/context/ThemeContext';
 import { useTimeFormat } from '@/services/features/hours_types';
 import { getPrayerTimes } from '@/services/prayerTimesService';
 import { PrayerTimesData } from '@/types/prayerTimes';
 import { determineNextPrayer, formatArabicDate } from '@/utils/prayerHelpers';
+import NextPrayerTime from '../../services/features/nextPrayerTime';
 
 export default function PrayerTimesScreen() {
   const [selectedCity, setSelectedCity] = useState<keyof typeof cityMapping>('القاهرة');
@@ -19,7 +18,16 @@ export default function PrayerTimesScreen() {
   const [loading, setLoading] = useState(false);
   const [currentDate, setCurrentDate] = useState('');
   const [nextPrayer, setNextPrayer] = useState<string | null>(null);
-  const colorScheme = useColorScheme();
+  const { isDarkMode, toggleTheme } = useTheme();
+  
+  // إضافة حالة لعرض قائمة المحافظات
+  const [isCityListVisible, setIsCityListVisible] = useState(false);
+  // إضافة حالة لبحث المحافظات
+  const [searchQuery, setSearchQuery] = useState('');
+  // قائمة المحافظات المفلترة
+  const filteredGovernates = egyptianGovernorates.filter(
+    city => city.includes(searchQuery)
+  );
   
   useEffect(() => {
     setCurrentDate(formatArabicDate());
@@ -27,7 +35,6 @@ export default function PrayerTimesScreen() {
     const fetchPrayerTimes = async () => {
       setLoading(true);
       try {
-        // Use the English city name for API with proper TypeScript handling
         const times = await getPrayerTimes(cityMapping[selectedCity]);
         setPrayerTimes(times as PrayerTimesData);
         setNextPrayer(determineNextPrayer(times as PrayerTimesData));
@@ -42,54 +49,220 @@ export default function PrayerTimesScreen() {
   }, [selectedCity]);
 
   return (
-    <ThemedView style={[styles.container, 
-      { backgroundColor: colorScheme === 'dark' ? '#121212' : '#FFFFFF' }]}>
-      
-      <LinearGradient
-        colors={getHeaderGradient(colorScheme === 'dark')}
-        style={styles.headerCard}>
-        <ThemedText style={styles.dateText}>{currentDate}</ThemedText>
-        <ThemedText style={styles.headerText}>مواقيت الصلاة</ThemedText>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: isDarkMode ? '#121212' : '#FFFFFF' }]}>
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* رأس الصفحة */}
+        <View style={styles.headerContainer}>
+          <LinearGradient
+            colors={getHeaderGradient(isDarkMode)}
+            style={styles.headerGradient}
+          >
+            <View style={styles.headerTopRow}>
+              <ThemedText style={styles.dateText}>{currentDate}</ThemedText>
+              
+              {/* زر تبديل الوضع */}
+              <TouchableOpacity 
+                onPress={toggleTheme} 
+                style={styles.themeToggleButton}
+              >
+                <MaterialCommunityIcons 
+                  name={isDarkMode ? "weather-sunny" : "weather-night"} 
+                  size={24} 
+                  color="#FFFFFF" 
+                />
+              </TouchableOpacity>
+            </View>
+            
+            <ThemedText style={styles.headerText}>مواقيت الصلاة</ThemedText>
+            
+            {/* زر اختيار المحافظة المحسن */}
+            <TouchableOpacity 
+              style={styles.citySelector} 
+              onPress={() => setIsCityListVisible(true)}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons 
+                name="map-marker" 
+                size={24} 
+                color="#FFFFFF" 
+              />
+              <ThemedText style={styles.cityText}>{selectedCity}</ThemedText>
+              <MaterialCommunityIcons 
+                name="chevron-down" 
+                size={22} 
+                color="#FFFFFF" 
+              />
+            </TouchableOpacity>
+          </LinearGradient>
+        </View>
         
-        <View style={styles.pickerWrapper}>
-          <MaterialCommunityIcons 
-            name="map-marker" 
-            size={24} 
-            color="#FFFFFF"
-            style={styles.pickerIcon} 
-          />
-          <Picker
-            selectedValue={selectedCity}
-            onValueChange={(itemValue) => setSelectedCity(itemValue as keyof typeof cityMapping)}
-            style={[styles.picker, { color: '#FFFFFF' }]}
-            dropdownIconColor="#FFFFFF">
-            {egyptianGovernorates.map((city) => (
-              <Picker.Item key={city} label={city} value={city} />
-            ))}
-          </Picker>
+        {/* محتوى الصفحة */}
+        <View style={styles.contentContainer}>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={isDarkMode ? "#64B5F6" : "#2196F3"} />
+              <ThemedText style={styles.loadingText}>جاري تحميل مواقيت الصلاة...</ThemedText>
+            </View>
+          ) : prayerTimes ? (
+            <>
+              <NextPrayerTime 
+                prayerTimes={prayerTimes}
+                nextPrayer={nextPrayer}
+                cityName={selectedCity}
+              />
+              
+              <View style={styles.timesContainer}>
+                {renderPrayerTimes(prayerTimes, nextPrayer, isDarkMode ? 'dark' : 'light')}
+              </View>
+            </>
+          ) : (
+            <ThemedText style={styles.noDataText}>لا توجد بيانات متاحة</ThemedText>
+          )}
         </View>
-      </LinearGradient>
+        
+        {/* مساحة إضافية في النهاية */}
+        <View style={styles.bottomSpace} />
+      </ScrollView>
       
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colorScheme === 'dark' ? "#64B5F6" : "#2196F3"} />
-          <ThemedText style={styles.loadingText}>جاري تحميل مواقيت الصلاة...</ThemedText>
+      {/* نافذة اختيار المحافظة */}
+      <Modal
+        visible={isCityListVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsCityListVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View 
+            style={[
+              styles.modalContainer, 
+              { 
+                backgroundColor: isDarkMode ? '#1D293E' : '#FFFFFF',
+                borderColor: isDarkMode ? '#2C3E50' : '#E0E0E0' 
+              }
+            ]}
+          >
+            <View style={styles.modalHeader}>
+              <ThemedText style={styles.modalTitle}>اختر المحافظة</ThemedText>
+              <TouchableOpacity 
+                style={styles.closeButton} 
+                onPress={() => setIsCityListVisible(false)}
+              >
+                <MaterialCommunityIcons 
+                  name="close" 
+                  size={24} 
+                  color={isDarkMode ? '#FFFFFF' : '#000000'} 
+                />
+              </TouchableOpacity>
+            </View>
+            
+            {/* تحسين شكل حقل البحث */}
+            <View 
+              style={[
+                styles.searchContainer, 
+                { 
+                  backgroundColor: isDarkMode ? '#2C3E50' : '#F5F5F5',
+                  borderColor: isDarkMode ? '#3D5A80' : '#E0E0E0' 
+                }
+              ]}
+            >
+              <MaterialCommunityIcons 
+                name="magnify" 
+                size={20} 
+                color={isDarkMode ? '#90CAF9' : '#757575'} 
+                style={styles.searchIcon}
+              />
+              <TextInput
+                style={[
+                  styles.searchInput,
+                  { color: isDarkMode ? '#FFFFFF' : '#000000' }
+                ]}
+                placeholder="بحث عن محافظة..."
+                placeholderTextColor={isDarkMode ? '#7D8FA0' : '#9E9E9E'}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                textAlign="right"
+              />
+              {searchQuery !== '' && (
+                <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
+                  <MaterialCommunityIcons 
+                    name="close-circle" 
+                    size={16} 
+                    color={isDarkMode ? '#7D8FA0' : '#9E9E9E'} 
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
+            
+            {/* تحسين عرض قائمة المحافظات */}
+            <FlatList
+              data={filteredGovernates}
+              keyExtractor={(item) => item}
+              style={styles.cityList}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 10 }}
+              renderItem={({ item }) => (
+                <TouchableOpacity 
+                  style={[
+                    styles.cityItem, 
+                    selectedCity === item && {
+                      backgroundColor: isDarkMode ? 'rgba(77,100,141,0.3)' : 'rgba(3,169,244,0.1)'
+                    }
+                  ]}
+                  onPress={() => {
+                    setSelectedCity(item as keyof typeof cityMapping);
+                    setIsCityListVisible(false);
+                    setSearchQuery('');
+                  }}
+                >
+                  <ThemedText 
+                    style={[
+                      styles.cityItemText,
+                      { color: isDarkMode ? '#FFFFFF' : '#000000' },
+                      selectedCity === item && { 
+                        fontWeight: 'bold',
+                        color: isDarkMode ? '#90CAF9' : '#1976D2' 
+                      }
+                    ]}
+                  >
+                    {item}
+                  </ThemedText>
+                  
+                  {selectedCity === item && (
+                    <MaterialCommunityIcons 
+                      name="check" 
+                      size={20} 
+                      color={isDarkMode ? '#90CAF9' : '#1976D2'} 
+                    />
+                  )}
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <View style={styles.emptyResultContainer}>
+                  <MaterialCommunityIcons 
+                    name="map-search-outline" 
+                    size={40} 
+                    color={isDarkMode ? '#5D7599' : '#BDBDBD'}
+                  />
+                  <ThemedText style={styles.emptyResultText}>
+                    لا توجد محافظات تطابق البحث
+                  </ThemedText>
+                </View>
+              }
+            />
+          </View>
         </View>
-      ) : prayerTimes ? (
-        <View style={styles.timesContainer}>
-          {renderPrayerTimes(prayerTimes, nextPrayer, colorScheme)}
-        </View>
-      ) : (
-        <ThemedText style={styles.noDataText}>لا توجد بيانات متاحة</ThemedText>
-      )}
-
+      </Modal>
+      
       <Image 
         source={require('@/assets/images/mosque_silhouette.png')} 
-        style={[styles.backgroundImage, 
-          { opacity: colorScheme === 'dark' ? 0.1 : 0.03 }]} 
+        style={[styles.backgroundImage, { opacity: isDarkMode ? 0.1 : 0.03 }]} 
         resizeMode="contain"
       />
-    </ThemedView>
+    </SafeAreaView>
   );
 }
 
@@ -132,10 +305,8 @@ function PrayerTimeRow({ name, time, icon, isNext, colorScheme }:
         />
       </View>
       
-      {/* Prayer time - Now using the formatTime function */}
       <ThemedText style={[styles.prayerTime, { color: textColor }]}>{formatTime(time)}</ThemedText>
       
-      {/* Prayer name */}
       <ThemedText style={[styles.prayerName, { color: textColor }]}>{name}</ThemedText>
       
       {isNext && (
@@ -175,21 +346,45 @@ function renderPrayerTimes(times: PrayerTimesData, nextPrayer: string | null, co
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    alignItems: 'center',
   },
-  headerCard: {
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
+  headerContainer: {
     width: '100%',
-    paddingTop: 60,
+  },
+  headerGradient: {
+    width: '100%',
+    paddingTop: Platform.OS === 'ios' ? 10 : 40,
     paddingBottom: 30,
     paddingHorizontal: 20,
     alignItems: 'center',
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
   },
+  headerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    paddingHorizontal: 10,
+    marginBottom: 10,
+  },
+  themeToggleButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   headerText: {
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#FFFFFF',
     marginBottom: 20,
@@ -198,28 +393,39 @@ const styles = StyleSheet.create({
   dateText: {
     fontSize: 16,
     color: '#FFFFFF',
-    marginBottom: 10,
     opacity: 0.9,
     textAlign: 'center',
   },
-  pickerWrapper: {
+  citySelector: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 10,
-    paddingHorizontal: 10,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     width: '80%',
+    marginTop: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
   },
-  pickerIcon: {
-    marginRight: 10,
+  cityText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',
+    flex: 1,
+    textAlign: 'center',
+    marginHorizontal: 8,
   },
-  picker: {
-    width: '90%',
-    height: 50,
+  contentContainer: {
+    width: '100%',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 15,
   },
   timesContainer: {
-    width: '90%',
-    paddingVertical: 20,
+    width: '100%',
+    paddingVertical: 10,
   },
   prayerCard: {
     flexDirection: 'row',
@@ -255,9 +461,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
   },
   loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
+    padding: 50,
   },
   loadingText: {
     marginTop: 15,
@@ -271,7 +477,6 @@ const styles = StyleSheet.create({
   nextPrayerBadge: {
     position: 'absolute',
     top: 0,
-    right: 0,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderTopRightRadius: 12,
@@ -288,5 +493,94 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '60%',
     zIndex: -1,
-  }
+  },
+  bottomSpace: {
+    height: 50,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContainer: {
+    width: '90%',
+    maxHeight: '70%',
+    borderRadius: 16,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    margin: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    position: 'relative',
+  },
+  searchIcon: {
+    marginLeft: 8,
+  },
+  searchInput: {
+    flex: 1,
+    height: 40,
+    fontSize: 16,
+    textAlign: 'right',
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+    paddingRight: 8,
+  },
+  clearButton: {
+    padding: 6,
+  },
+  cityList: {
+    paddingHorizontal: 8,
+    paddingBottom: 12,
+  },
+  cityItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginVertical: 2,
+    marginHorizontal: 4,
+  },
+  cityItemText: {
+    fontSize: 16,
+    fontWeight: '400',
+  },
+  emptyResultContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 30,
+  },
+  emptyResultText: {
+    marginTop: 10,
+    textAlign: 'center',
+    opacity: 0.7,
+  },
 });

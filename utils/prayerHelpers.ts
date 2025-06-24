@@ -1,7 +1,7 @@
 import { PrayerTimesData } from '@/types/prayerTimes';
 
 /**
- * Determine the next prayer based on current time
+ * تحديد الصلاة التالية بناءً على الوقت الحالي
  */
 export const determineNextPrayer = (times: PrayerTimesData | null): string | null => {
   if (!times) return null;
@@ -20,6 +20,7 @@ export const determineNextPrayer = (times: PrayerTimesData | null): string | nul
     { name: 'isha', time: times.isha }
   ];
   
+  // البحث عن أول صلاة لم تحن بعد
   for (const prayer of prayers) {
     const [prayerHour, prayerMinute] = prayer.time.split(':').map(Number);
     const prayerTime = prayerHour * 60 + prayerMinute;
@@ -29,12 +30,12 @@ export const determineNextPrayer = (times: PrayerTimesData | null): string | nul
     }
   }
   
-  // If all prayers have passed, next prayer is Fajr tomorrow
+  // إذا مرت جميع الصلوات، فالصلاة التالية هي الفجر غداً
   return 'fajr';
 };
 
 /**
- * Format the date in Arabic
+ * تنسيق التاريخ بالعربية
  */
 export const formatArabicDate = (): string => {
   const date = new Date();
